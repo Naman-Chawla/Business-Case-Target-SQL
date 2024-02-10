@@ -1,0 +1,275 @@
+## Exploration of Data: -> 
+
+Imported the dataset and did usual exploratory analysis steps like checking the structure & characteristics of the dataset:
+Data-type of "customers" table
+customer_id - STRING
+customer_unique_id - STRING
+customer_zip_code_prefix - INTEGER
+customer_city - STRING
+customer_state - STRING 
+________________________________________________________________________________________________________________________________________________________________________
+# Getting the time range between which the orders were placed
+Aggregated function like min and max are used to get the minimum date/time and maximum date/time for the given duration,
+SELECT 
+extract(date from (min(order_purchase_timestamp))) as start_date,
+extract(time from (min(order_purchase_timestamp))) as start_purchase_time,
+extract(date from (max(order_purchase_timestamp))) as end_date,
+extract(time from (max(order_purchase_timestamp))) as end_purchase_time,
+ FROM `business-case-study-391612.SQLBusinessCase.orders`
+________________________________________________________________________________________________________________________________________________________________________
+# Counted the Cities & States of customers who ordered during the given period.
+To count the number of Unique states and cities Distinct has been used along with Count aggregated fun. to get the total count  
+SELECT 
+count(distinct customer_state) as state_count,
+count(distinct customer_city) as city_count
+FROM `SQLBusinessCase.customers
+________________________________________________________________________________________________________________________________________________________________________
+________________________________________________________________________________________________________________________________________________________________________
+## In-depth Exploration: ->
+
+# Year_wise_seasonality_ --Conclusing the trend in the market for the no. of orders placed over the given years range.
+Extracting the years and grouping them to get the total count of orders being placed.
+SELECT
+extract(year from order_purchase_timestamp) as Year,
+count(*) as order_count
+FROM `SQLBusinessCase.orders`
+GROUP BY Year
+Order By Year
+
+ANALYSIS – Yes there is a growing trend in the numbers of orders being places over the given years
+STATE – SP was the most active contributor to the no. of orders being placed
+________________________________________________________________________________________________________________________________________________________________________
+# Month_wise_seasonality_ - to get an idea about seasonality across different months
+Extracting the years/month and grouping them to get the total count of orders being placed.
+
+SELECT 
+extract(Year from order_purchase_timestamp) as Year,
+extract(Month from order_purchase_timestamp) as Month,
+count(extract(Month from order_purchase_timestamp)) as order_count
+FROM `SQLBusinessCase.orders`
+Group By Year, Month
+Order By Year, Month
+
+ANALYSIS – In the year 2017 the order_count in November were on BOOM!!!! Which was continued 
+till MAY 2018 and got dropped from 2018  August onwards
+
+Recommendation – we can introduce new products in the market during this 
+time with a nice discount to increase the overall sales.
+________________________________________________________________________________________________________________________________________________________________________
+# The time of the day Brazilian customers placed most of the orders (Dawn, Morning, Afternoon or Night)?
+Firstly extract the hour parameter for the given table then used Countif fundtion to count the rows based on the condition provided
+
+SELECT 
+COUNTIF(a.purchase_Hour between 0 and 6 ) as Dawn,
+COUNTIF(a.purchase_Hour between 7 and 12 ) as Mornings,
+COUNTIF(a.purchase_Hour between 13 and 18 ) as Afternoon,
+COUNTIF(a.purchase_Hour between 19 and 23 ) as Night
+FROM(SELECT
+    extract(hour from order_purchase_timestamp) as purchase_Hour
+    FROM `SQLBusinessCase.orders`) as a
+
+ANALYSIS – Afternoons > Night time > Mornings > Dawn are the 
+time zones in which customers order most
+
+Recommendation – The quantity of product or the 
+product_stock must be available for the customers.
+Moreover we can launch deals during this time to attract more 
+customers and by taking data from the question, we can target the 
+market at a particular month frame to BOOM!!! the sales
+________________________________________________________________________________________________________________________________________________________________________
+________________________________________________________________________________________________________________________________________________________________________
+## Evolution of E-commerce orders in the Brazil region: ->
+# Getting the month on month no. of orders placed in each state.
+Using LEFT JOIN to join CUSTOMERS and ORDERS table to get all the possible order placed by all customers in the database.
+Using extract function to extract the months and using this table as subquerry. By grouping the data on states and months 
+we can get the count of order being placed by customers month wise and region wise.
+
+select a.customer_state,a.month, count(a.month) as Order_count
+from(select *,
+        extract(month from order_purchase_timestamp) as month
+        from  `SQLBusinessCase.customers` as c Left join `SQLBusinessCase.orders` as o
+        ON c.customer_id = o.customer_id) as a
+group by a.customer_state, a.month
+order by a.customer_state, a.month
+
+Analysis – Based on the aggregation firstly done on state then on month, as it is  giving clear idea about difference in order_count for each month,
+We can figure out the state and the month range which contribute most in order_count 
+________________________________________________________________________________________________________________________________________________________________________
+# Distribution of customers across all the states.
+
+SELECT customer_state,
+count(*) as no_of_customers
+FROM `SQLBusinessCase.customers`
+GROUP BY customer_state
+ORDER BY no_of_customers
+________________________________________________________________________________________________________________________________________________________________________
+________________________________________________________________________________________________________________________________________________________________________
+## Impact on Economy: Analyze the money movement by e-commerce by looking at order prices, freight and other: ->
+# Getting the % increase in the cost of orders from year 2017 to 2018 (include months between Jan to Aug only).
+PAYMENT-VALUE table is used to get the cost of oders.
+
+select x.total_payment_2018, y.total_payment_2017,
+((x.total_payment_2018 - y.total_payment_2017)/y.total_payment_2017)*100 as percentage_change
+  from
+  (select SUM(a.payment_value) as total_payment_2018,
+  row_number() over(order by SUM(a.payment_value)) as id1
+  from(SELECT *,
+  extract(Year from o.order_purchase_timestamp) as Year
+  FROM `SQLBusinessCase.payments` as p inner join `SQLBusinessCase.orders` as o
+  ON p.order_id = o.order_id
+  WHERE extract(Year from o.order_purchase_timestamp)  IN (2017, 2018) 
+  and extract(Month from o.order_purchase_timestamp) between 1 and 8 ) as a
+  Group by a.Year
+  order by a.Year desc
+  LIMIT 1) as x join
+  (select SUM(a.payment_value) as total_payment_2017,
+  ROW_Number() over(order by SUM(a.payment_value)) as id2
+  from(SELECT *,
+  extract(Year from o.order_purchase_timestamp) as Year
+  FROM `SQLBusinessCase.payments` as p inner join `SQLBusinessCase.orders` as o
+  ON p.order_id = o.order_id
+  WHERE extract(Year from o.order_purchase_timestamp)  IN (2017, 2018) 
+  and extract(Month from o.order_purchase_timestamp) between 1 and 8 ) as a
+  Group by a.Year
+  order by a.Year desc
+  LIMIT 1 offset 1) as y
+  ON x.id1 != y.id2
+________________________________________________________________________________________________________________________________________________________________________
+# Total & Average value of order price for each state.
+
+SELECT c.customer_state,
+ROUND(SUM(payment_value),3) as Total_order_price,
+ROUND(AVG(payment_value),3) as Average_order_price,
+FROM `SQLBusinessCase.customers` as c LEFT JOIN `SQLBusinessCase.orders` as o
+ON c.customer_id = o.customer_id LEFT JOIN `SQLBusinessCase.payments` as p
+ON o.order_id = p.order_id
+GROUP BY c.customer_state 
+ORDER BY c.customer_state
+________________________________________________________________________________________________________________________________________________________________________
+# Calculate the Total & Average value of order freight for each state.
+
+SELECT c.customer_state,
+ROUND(SUM(ot.freight_value),3) as Total_freight_value,
+ROUND(AVG(ot.freight_value),3) as Average_freight_value,
+FROM `SQLBusinessCase.customers` as c LEFT JOIN `SQLBusinessCase.orders` as o
+ON c.customer_id = o.customer_id LEFT JOIN `SQLBusinessCase.order_items` as ot
+ON o.order_id = ot.order_id
+GROUP BY c.customer_state 
+ORDER BY c.customer_state
+________________________________________________________________________________________________________________________________________________________________________
+________________________________________________________________________________________________________________________________________________________________________
+## Analysis based on sales, freight and delivery time: ->
+
+# Find the no. of days taken to deliver each order from the order’s purchase date
+as delivery time.Also, calculate the difference (in days) between the estimated & actual 
+delivery date of an order.Do this in a single query.
+
+SELECT order_id, order_purchase_timestamp, order_delivered_customer_date, order_estimated_delivery_date,
+date_diff(order_delivered_customer_date, order_purchase_timestamp, DAY) as delivery_time,
+date_diff(order_estimated_delivery_date, order_delivered_customer_date, DAY) as diff_estimated_delivery
+FROM `SQLBusinessCase.orders`
+WHERE order_delivered_customer_date is not null and order_status = "delivered"
+________________________________________________________________________________________________________________________________________________________________________
+# Find out the top 5 states with the highest & lowest average freight value
+
+WITH L as 
+  (SELECT c.customer_state as Lowest_state,
+  ROUND(AVG(ot.freight_value),3) as Lowest_freight_value,
+  ROW_NUMBER() over(order by ROUND(AVG(ot.freight_value),3)) as id1,
+  FROM `SQLBusinessCase.customers` as c LEFT JOIN `SQLBusinessCase.orders` as o
+  ON c.customer_id = o.customer_id LEFT JOIN `SQLBusinessCase.order_items` as ot
+  ON o.order_id = ot.order_id
+  GROUP BY c.customer_state
+  LIMIT 5
+  ),
+H as 
+  (SELECT c.customer_state as Highest_state,
+  ROUND(AVG(ot.freight_value),3) as Highest_freight_value,
+  ROW_NUMBER() over(order by ROUND(AVG(ot.freight_value),3) desc) as id2,
+  FROM `SQLBusinessCase.customers` as c LEFT JOIN `SQLBusinessCase.orders` as o
+  ON c.customer_id = o.customer_id LEFT JOIN `SQLBusinessCase.order_items` as ot
+  ON o.order_id = ot.order_id
+  GROUP BY c.customer_state 
+  LIMIT 5
+  )
+  
+  SELECT L.Lowest_state, L.Lowest_freight_value, H.Highest_state, H.Highest_freight_value
+  FROM L INNER JOIN H
+  ON L.id1 = H.id2
+________________________________________________________________________________________________________________________________________________________________________
+# Find out the top 5 states with the highest & lowest average delivery time.
+
+WITH L as 
+  (SELECT c.customer_state as Low_state,
+  AVG(t.delivery_time) as Low_AVG_del_time,
+  ROW_NUMBER() over(order by AVG(t.delivery_time)) as id1
+  FROM `SQLBusinessCase.customers` as c RIGHT JOIN (SELECT order_id,customer_id,
+      date_diff(order_delivered_customer_date, order_purchase_timestamp, DAY) as delivery_time
+      FROM `SQLBusinessCase.orders`
+      WHERE order_delivered_customer_date is not null and order_status = "delivered") as t
+  ON c.customer_id = t.customer_id
+  GROUP BY c.customer_state
+  LIMIT 5
+),
+H as(
+  SELECT c.customer_state as High_state,
+  AVG(t.delivery_time) as High_AVG_del_time,
+  ROW_NUMBER() over(order by AVG(t.delivery_time) desc) as id2
+  FROM `SQLBusinessCase.customers` as c RIGHT JOIN (SELECT order_id,customer_id,
+      date_diff(order_delivered_customer_date, order_purchase_timestamp, DAY) as delivery_time
+      FROM `SQLBusinessCase.orders`
+      WHERE order_delivered_customer_date is not null and order_status = "delivered") as t
+  ON c.customer_id = t.customer_id
+  GROUP BY c.customer_state
+  LIMIT 5
+)
+SELECT L.Low_state, L.Low_AVG_del_time, H.High_state, H.High_AVG_del_time
+FROM L INNER JOIN H 
+ON L.id1 = H.id2
+________________________________________________________________________________________________________________________________________________________________________
+# Find out the top 5 states where the order delivery is really fast as compared to the estimated date of delivery.
+You can use the difference between the averages of actual & estimated delivery date to figure out how fast the delivery was for each state.
+
+SELECT customer_state,
+AVG(date_diff(order_estimated_delivery_date, order_delivered_customer_date, DAY)) as diff_estimated_delivery
+FROM `SQLBusinessCase.orders` as o Left join `SQLBusinessCase.customers` as c
+ON o.customer_id = c.customer_id
+WHERE order_delivered_customer_date is not null and order_status = "delivered"
+GROUP BY customer_state
+ORDER BY diff_estimated_delivery desc
+LIMIT 5
+________________________________________________________________________________________________________________________________________________________________________
+________________________________________________________________________________________________________________________________________________________________________
+## Analysis based on the payments: ->
+
+# Find the month on month no. of orders placed using different payment types.
+
+SELECT a.month, a.payment_type, COUNT(a.payment_type) as ORDE_Count
+FROM (select *,
+        extract(month from order_purchase_timestamp) as month
+        from `SQLBusinessCase.orders` as o FULL OUTER JOIN `SQLBusinessCase.payments` as p
+        ON o.order_id = p.order_id) as a
+GROUP BY a.month, a.payment_type
+HAVING a.payment_type is not null
+ORDER BY a.month, a.payment_type  
+________________________________________________________________________________________________________________________________________________________________________
+# Find the no. of orders placed on the basis of the payment installments that have been paid.
+
+select p.payment_installments, count(*) as ordercount_by_payment_installments
+from `SQLBusinessCase.orders` as o
+join `SQLBusinessCase.payments` as p 
+on p.order_id = o.order_id
+WHERE payment_value != 0
+group by p.payment_installments
+order by ordercount_by_payment_installments
+________________________________________________________________________________________________________________________________________________________________________
+________________________________________________________________________________________________________________________________________________________________________
+________________________________________________________________________________________________________________________________________________________________________
+
+
+
+
+
+
+
+
