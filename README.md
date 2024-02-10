@@ -8,12 +8,12 @@ By analyzing this extensive dataset, it becomes possible to gain valuable insigh
 The data is available in 8 csv files:
 
 customers.csv <br>
-sellers.csv
-order_items.csv
-geolocation.csv
-payments.csv
-reviews.csv
-orders.csv
+sellers.csv <br>
+order_items.csv <br>
+geolocation.csv <br>
+payments.csv <br>
+reviews.csv <br>
+orders.csv <br>
 products.csv
 
 
